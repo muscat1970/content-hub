@@ -9,7 +9,11 @@ const X_LIMIT_DEFAULT = 280;
 const Icon = {
   Spark: (p) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path d="M12 2l1.6 6.2L20 10l-6.4 1.8L12 18l-1.6-6.2L4 10l6.4-1.8L12 2Z" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M12 2l1.6 6.2L20 10l-6.4 1.8L12 18l-1.6-6.2L4 10l6.4-1.8L12 2Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
     </svg>
   ),
   Plus: (p) => (
@@ -41,7 +45,12 @@ const Icon = {
   Copy: (p) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
       <path d="M8 8h11v11H8V8Z" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M5 16H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M5 16H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v1"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
     </svg>
   ),
   Image: (p) => (
@@ -102,12 +111,6 @@ const Icon = {
   Bolt: (p) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
       <path d="M13 2 4 14h7l-1 8 10-14h-7l0-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-    </svg>
-  ),
-  Tag: (p) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path d="M20 13l-7 7-11-11V2h7l11 11Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-      <path d="M7.5 7.5h.01" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
     </svg>
   ),
 };
@@ -173,13 +176,9 @@ function sortItems(items, sortKey) {
     case "oldest":
       return arr.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
     case "mostUsed":
-      return arr.sort(
-        (a, b) => (b.usedCount ?? 0) - (a.usedCount ?? 0) || (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0)
-      );
+      return arr.sort((a, b) => (b.usedCount ?? 0) - (a.usedCount ?? 0) || (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0));
     case "leastUsed":
-      return arr.sort(
-        (a, b) => (a.usedCount ?? 0) - (b.usedCount ?? 0) || (a.lastUsedAt ?? 0) - (b.lastUsedAt ?? 0)
-      );
+      return arr.sort((a, b) => (a.usedCount ?? 0) - (b.usedCount ?? 0) || (a.lastUsedAt ?? 0) - (b.lastUsedAt ?? 0));
     case "lru":
     default:
       return arr.sort((a, b) => (a.lastUsedAt ?? 0) - (b.lastUsedAt ?? 0));
@@ -188,29 +187,25 @@ function sortItems(items, sortKey) {
 
 // ---------- Tweet Preview ----------
 function parseSegments(t) {
-  // remove zero-width / invisible chars first
   const cleaned = (t || "").replace(/[\u200B-\u200D\uFEFF]/g, "");
-
-  // include combining marks (\p{M}) so hashtags/mentions with diacritics stay intact
   const re = /(https?:\/\/[^\s]+)|(#(?:[\p{L}\p{M}\p{N}_]+))|(@(?:[\p{L}\p{M}\p{N}_]+))/gu;
 
   const out = [];
   let lastIndex = 0;
   for (const m of cleaned.matchAll(re)) {
-    const idx = m.index;
-    if (idx > lastIndex) out.push({ type: "text", text: cleaned.slice(lastIndex, idx) });
-    if (m[1]) out.push({ type: "link", text: m[1] });
-    else if (m[2]) out.push({ type: "hashtag", text: m[2] });
-    else if (m[3]) out.push({ type: "mention", text: m[3] });
+    const idx = m.index ?? 0;
+    if (idx > lastIndex) out.push({ type: "text", value: cleaned.slice(lastIndex, idx) });
+    if (m[1]) out.push({ type: "link", value: m[1] });
+    else if (m[2]) out.push({ type: "tag", value: m[2] });
+    else if (m[3]) out.push({ type: "mention", value: m[3] });
     lastIndex = idx + m[0].length;
   }
-  if (lastIndex < cleaned.length) out.push({ type: "text", text: cleaned.slice(lastIndex) });
+  if (lastIndex < cleaned.length) out.push({ type: "text", value: cleaned.slice(lastIndex) });
   return out;
 }
 
 function TweetPreview({ text, timeLabel = "الآن", quick = false }) {
   const segs = useMemo(() => parseSegments(text), [text]);
-
   return (
     <div className={`tweet ${quick ? "tweetQuick" : ""}`}>
       <div className="tweetAvatar" aria-hidden="true" />
@@ -223,15 +218,10 @@ function TweetPreview({ text, timeLabel = "الآن", quick = false }) {
         </div>
         <div className="tweetText">
           {segs.map((s, idx) => {
-            if (s.type === "text") return <span key={idx}>{s.text}</span>;
-            if (s.type === "link")
-              return (
-                <a key={idx} className="tweetLink" href={s.text} target="_blank" rel="noreferrer">
-                  {s.text}
-                </a>
-              );
-            if (s.type === "hashtag") return <span key={idx} className="tweetTag">{s.text}</span>;
-            return <span key={idx} className="tweetMention">{s.text}</span>;
+            if (s.type === "text") return <span key={idx}>{s.value}</span>;
+            if (s.type === "link") return <span key={idx} className="tweetLink">{s.value}</span>;
+            if (s.type === "tag") return <span key={idx} className="tweetTag">{s.value}</span>;
+            return <span key={idx} className="tweetMention">{s.value}</span>;
           })}
         </div>
       </div>
@@ -251,7 +241,6 @@ const seedData = {
   ],
   textsByCategory: { "cat-morning": [] },
   imagesByCategory: { "cat-morning": [] },
-  hashtagsByCategory: { "cat-morning": "#صباح_الخير" }, // جديد
 };
 
 function normalizeTexts(map) {
@@ -282,16 +271,10 @@ function normalizeImages(map) {
   return out;
 }
 
-function normalizeHashtags(map, categories) {
-  const out = { ...(map || {}) };
-  for (const c of categories || []) {
-    if (typeof out[c.id] !== "string") out[c.id] = "";
-  }
-  return out;
-}
-
 function migrate(raw) {
   if (!raw || typeof raw !== "object") return seedData;
+
+  // قبول البيانات القديمة (لو فيها hashtagsByCategory نتجاهلها)
   if (raw.textsByCategory && raw.imagesByCategory) {
     const categories = raw.categories ?? seedData.categories;
     return {
@@ -300,7 +283,6 @@ function migrate(raw) {
       categories,
       textsByCategory: normalizeTexts(raw.textsByCategory),
       imagesByCategory: normalizeImages(raw.imagesByCategory),
-      hashtagsByCategory: normalizeHashtags(raw.hashtagsByCategory, categories),
     };
   }
   return seedData;
@@ -332,7 +314,7 @@ export default function App() {
   const [viewImages, setViewImages] = useState("normal"); // normal | compact | full
   const [focusMode, setFocusMode] = useState("both"); // both | texts | images
 
-  const [quickMode, setQuickMode] = useState(false); // (3) وضع السرعة
+  const [quickMode, setQuickMode] = useState(false); // (ما زال زر فقط - بدون اختصار)
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState("");
 
@@ -340,9 +322,6 @@ export default function App() {
   const [selectedTextIds, setSelectedTextIds] = useState([]);
   const [selectedImageIds, setSelectedImageIds] = useState([]);
   const [targetCategoryId, setTargetCategoryId] = useState("");
-
-  // Hashtags
-  const [hashtagsDraft, setHashtagsDraft] = useState("");
 
   // (16) تمييز آخر عنصر تم نسخه
   const [lastCopied, setLastCopied] = useState(null); // { kind: "text", id, ts }
@@ -370,12 +349,6 @@ export default function App() {
     () => data.categories.find((c) => c.id === activeCategoryId) || null,
     [data.categories, activeCategoryId]
   );
-
-  // عند تغيير المجموعة، جهّز الهاشتاقات
-  useEffect(() => {
-    if (!activeCategoryId) return;
-    setHashtagsDraft(data.hashtagsByCategory?.[activeCategoryId] ?? "");
-  }, [activeCategoryId, data.hashtagsByCategory]);
 
   const rawTexts = useMemo(
     () => (activeCategoryId ? data.textsByCategory?.[activeCategoryId] || [] : []),
@@ -414,7 +387,7 @@ export default function App() {
     return sortItems(filtered, sortImages);
   }, [rawImages, searchImage, sortImages]);
 
-  // Quick mode يضبط العرض تلقائيًا (بطاقات أصغر + نسخ أسرع)
+  // Quick mode يضبط العرض تلقائيًا (زر فقط)
   useEffect(() => {
     if (!activeCategoryId) return;
     if (quickMode) {
@@ -470,7 +443,6 @@ export default function App() {
       categories: [newCat, ...prev.categories],
       textsByCategory: { ...(prev.textsByCategory || {}), [newCat.id]: [] },
       imagesByCategory: { ...(prev.imagesByCategory || {}), [newCat.id]: [] },
-      hashtagsByCategory: { ...(prev.hashtagsByCategory || {}), [newCat.id]: "" },
     }));
     setNewCatName("");
   };
@@ -499,11 +471,9 @@ export default function App() {
       const nextCats = prev.categories.filter((c) => c.id !== catId);
       const nextTexts = { ...(prev.textsByCategory || {}) };
       const nextImages = { ...(prev.imagesByCategory || {}) };
-      const nextTags = { ...(prev.hashtagsByCategory || {}) };
       delete nextTexts[catId];
       delete nextImages[catId];
-      delete nextTags[catId];
-      return { ...prev, categories: nextCats, textsByCategory: nextTexts, imagesByCategory: nextImages, hashtagsByCategory: nextTags };
+      return { ...prev, categories: nextCats, textsByCategory: nextTexts, imagesByCategory: nextImages };
     });
 
     if (activeCategoryId === catId) setActiveCategoryId(null);
@@ -517,7 +487,6 @@ export default function App() {
     const canonNew = canonicalizeArabic(cleaned);
     const exactExists = rawTexts.some((t) => canonicalizeArabic(t.text) === canonNew);
 
-    // Similarity check (خفيف)
     const sample = rawTexts.slice(0, 40);
     const simHit = sample.some((t) => similarityJaccard(t.text, cleaned) >= 0.9);
 
@@ -569,9 +538,7 @@ export default function App() {
     const now = Date.now();
     setData((prev) => {
       const current = prev.textsByCategory?.[activeCategoryId] || [];
-      const updated = current.map((t) =>
-        t.id === id ? { ...t, lastUsedAt: now, usedCount: (t.usedCount || 0) + 1 } : t
-      );
+      const updated = current.map((t) => (t.id === id ? { ...t, lastUsedAt: now, usedCount: (t.usedCount || 0) + 1 } : t));
       const picked = updated.find((t) => t.id === id);
       const rest = updated.filter((t) => t.id !== id);
       const nextList = picked ? (moveToTop ? [picked, ...rest] : [...rest, picked]) : updated;
@@ -591,14 +558,6 @@ export default function App() {
 
   const copyText = async (item) => {
     await copyToClipboard(item.text);
-    setLastCopied({ kind: "text", id: item.id, ts: Date.now() });
-    bumpTextUsage(item.id, false);
-  };
-
-  const copyTextWithHashtags = async (item) => {
-    const tags = (data.hashtagsByCategory?.[activeCategoryId] || "").trim();
-    const payload = tags ? `${item.text}\n\n${tags}` : item.text;
-    await copyToClipboard(payload);
     setLastCopied({ kind: "text", id: item.id, ts: Date.now() });
     bumpTextUsage(item.id, false);
   };
@@ -651,9 +610,7 @@ export default function App() {
     const now = Date.now();
     setData((prev) => {
       const current = prev.imagesByCategory?.[activeCategoryId] || [];
-      const updated = current.map((i) =>
-        i.id === id ? { ...i, lastUsedAt: now, usedCount: (i.usedCount || 0) + 1 } : i
-      );
+      const updated = current.map((i) => (i.id === id ? { ...i, lastUsedAt: now, usedCount: (i.usedCount || 0) + 1 } : i));
       const picked = updated.find((i) => i.id === id);
       const rest = updated.filter((i) => i.id !== id);
       const nextList = picked ? (moveToTop ? [picked, ...rest] : [...rest, picked]) : updated;
@@ -707,10 +664,7 @@ export default function App() {
           return next;
         }
         const dst = next.textsByCategory?.[targetCategoryId] || [];
-        const toInsert =
-          action === "copy"
-            ? picked.map((t) => ({ ...t, id: uid("t"), createdAt: Date.now() }))
-            : picked;
+        const toInsert = action === "copy" ? picked.map((t) => ({ ...t, id: uid("t"), createdAt: Date.now() })) : picked;
         next.textsByCategory = {
           ...(next.textsByCategory || {}),
           [activeCategoryId]: action === "move" ? rest : src,
@@ -727,10 +681,7 @@ export default function App() {
         return next;
       }
       const dst = next.imagesByCategory?.[targetCategoryId] || [];
-      const toInsert =
-        action === "copy"
-          ? picked.map((i) => ({ ...i, id: uid("i"), createdAt: Date.now() }))
-          : picked;
+      const toInsert = action === "copy" ? picked.map((i) => ({ ...i, id: uid("i"), createdAt: Date.now() })) : picked;
       next.imagesByCategory = {
         ...(next.imagesByCategory || {}),
         [activeCategoryId]: action === "move" ? rest : src,
@@ -742,39 +693,20 @@ export default function App() {
     clearSelection();
   };
 
-  // ---------- Hashtags save ----------
-  const saveHashtags = () => {
-    if (!activeCategoryId) return;
-    setData((prev) => ({
-      ...prev,
-      hashtagsByCategory: { ...(prev.hashtagsByCategory || {}), [activeCategoryId]: hashtagsDraft },
-    }));
-  };
-
   // ---------- Keyboard shortcuts + navigation ----------
   useEffect(() => {
     if (!activeCategoryId) return;
 
     const onKeyDown = (e) => {
-      // لا نخربط وأنت تكتب داخل input/textarea/select
       const tag = (e.target?.tagName || "").toLowerCase();
       const isTyping = tag === "input" || tag === "textarea" || tag === "select";
       const isMeta = e.metaKey || e.ctrlKey;
 
-      // Ctrl/Cmd + K: Toggle Quick mode (اختصار لطيف)
-      if (isMeta && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setQuickMode((v) => !v);
-        return;
-      }
-
-      // Ctrl/Cmd + C: نسخ العنصر المحدد (ليس نسخ النص المحدد بالماوس)
+      // Ctrl/Cmd + C: نسخ العنصر النشط (ليس نسخ النص المحدد داخل textarea)
       if (isMeta && e.key.toLowerCase() === "c") {
-        if (isTyping) return; // خليه طبيعي داخل الكتابة
+        if (isTyping) return;
         e.preventDefault();
-        const one = selectedTextIds.length === 1
-          ? texts.find((t) => t.id === selectedTextIds[0])
-          : texts[activeTextIndex];
+        const one = selectedTextIds.length === 1 ? texts.find((t) => t.id === selectedTextIds[0]) : texts[activeTextIndex];
         if (one) copyText(one);
         return;
       }
@@ -787,7 +719,6 @@ export default function App() {
           const n = texts.length;
           if (!n) return 0;
           const next = Math.max(0, Math.min(n - 1, i + dir));
-          // تمرير داخل لوحة النصوص إلى العنصر
           window.requestAnimationFrame(() => {
             const el = document.querySelector(`[data-text-card="${texts[next]?.id}"]`);
             el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -796,19 +727,11 @@ export default function App() {
         });
         return;
       }
-
-      // Enter: نسخ العنصر النشط (في Quick mode) عند عدم الكتابة
-      if (!isTyping && e.key === "Enter" && quickMode) {
-        e.preventDefault();
-        const one = texts[activeTextIndex];
-        if (one) copyText(one);
-        return;
-      }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeCategoryId, texts, activeTextIndex, selectedTextIds, quickMode]);
+  }, [activeCategoryId, texts, activeTextIndex, selectedTextIds]);
 
   // ---------- Counts ----------
   const charCount = newText.length;
@@ -932,11 +855,11 @@ export default function App() {
         <div className="actions">
           <div className="pill">حد X: {xLimit}</div>
 
-          {/* Quick mode */}
+          {/* Quick mode (زر فقط) */}
           <button
             className={`btn iconOnly ${quickMode ? "btnActive" : ""}`}
             onClick={() => setQuickMode((v) => !v)}
-            title="Quick mode (Ctrl+K)"
+            title="Quick mode"
           >
             <Icon.Bolt />
           </button>
@@ -1107,20 +1030,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Hashtags */}
-            <div className="row" style={{ marginBottom: 10 }}>
-              <input
-                className="input"
-                placeholder="هاشتاقات المجموعة… مثال: #عُمان #صباح_الخير"
-                value={hashtagsDraft}
-                onChange={(e) => setHashtagsDraft(e.target.value)}
-                onBlur={saveHashtags}
-              />
-              <button className="btn iconOnly" onClick={saveHashtags} title="حفظ الهاشتاقات">
-                <Icon.Tag />
-              </button>
-            </div>
-
             {selectedTextIds.length > 0 && (
               <div className="bulkBar">
                 <div className="bulkInfo">محدد: {selectedTextIds.length}</div>
@@ -1182,7 +1091,6 @@ export default function App() {
                       className={`card innerCard ${isSel ? "selected" : ""} ${isDup ? "dup" : ""} ${isActive ? "activeCard" : ""} ${isCopied ? "copiedFlash" : ""} ${removing ? "removing" : ""}`}
                       onMouseEnter={() => setActiveTextIndex(idx)}
                       onClick={() => {
-                        // Quick mode: نقرة على البطاقة = نسخ سريع
                         if (quickMode) copyText(t);
                       }}
                     >
@@ -1197,7 +1105,6 @@ export default function App() {
                         </button>
                       </div>
 
-                      {/* Tweet preview */}
                       <TweetPreview
                         text={t.text}
                         timeLabel={t.lastUsedAt ? formatDate(t.lastUsedAt) : "الآن"}
@@ -1223,9 +1130,6 @@ export default function App() {
                           <button className="btn primary iconOnly" onClick={() => copyText(t)} title="نسخ">
                             <Icon.Copy />
                           </button>
-                          <button className="btn iconOnly" onClick={() => copyTextWithHashtags(t)} title="نسخ مع هاشتاقات">
-                            <Icon.Tag />
-                          </button>
                           <button className="btn iconOnly" onClick={() => bumpTextUsage(t.id, true)} title="تسجيل استخدام + للأعلى">
                             <Icon.Check />
                           </button>
@@ -1241,7 +1145,7 @@ export default function App() {
             </div>
 
             <div className="footerHint">
-              اختصارات: Ctrl+K (Quick) • Ctrl+C (نسخ العنصر النشط) • ↑↓ للتنقل • Quick: Enter للنسخ
+              اختصارات: Ctrl+C (نسخ العنصر النشط) • ↑↓ للتنقل
             </div>
           </section>
         </div>
@@ -1278,7 +1182,7 @@ export default function App() {
         </div>
       )}
 
-      <div className="footer">Quick • Tweet Preview • Hashtags • Animations ✅</div>
+      <div className="footer">Tweet Preview • Animations ✅</div>
     </div>
   );
 }
