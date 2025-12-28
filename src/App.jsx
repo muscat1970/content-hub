@@ -3,7 +3,7 @@ import "./App.css";
 
 const LS_KEY = "content-hub";
 const AUTH_KEY = "content-hub-auth";
-const APP_PASSWORD = "1234"; // ← غيّرها
+const APP_PASSWORD = "12@34"; // ← غيّرها
 const X_LIMIT_DEFAULT = 280;
 
 // ---------- utils ----------
@@ -417,10 +417,6 @@ export default function App() {
         <div className="authCard">
           <div className="authBrand">
             <div className="logo"><I.Spark /></div>
-            <div>
-              <div className="title">مخزني الإبداعي</div>
-              <div className="subtitle">أدخل كلمة المرور للمتابعة</div>
-            </div>
           </div>
 
           <input
@@ -436,11 +432,11 @@ export default function App() {
           {passErr && <div className="error">{passErr}</div>}
 
           <button className="btn primary wide" onClick={login}>
-            دخول <span className="spacer" />
+             <span className="spacer" />
             <I.Enter style={{ width: 18, height: 18 }} />
           </button>
 
-          <div className="hint">ملاحظة: هذه حماية شكلية وليست أمانًا حقيقيًا على GitHub Pages.</div>
+          <div className="hint"></div>
         </div>
       </div>
     );

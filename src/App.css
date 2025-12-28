@@ -84,11 +84,12 @@ body{
   gap: 12px;
   margin-top: 12px;
 }
-.page{
-  height: calc(100vh - 120px);
-  display:flex;
-  flex-direction: column;
-  margin-top: 12px;
+.page{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:14px; }
+/* لما تختار نص فقط أو صور فقط يصير عمود واحد */
+.page.single{ grid-template-columns: 1fr; }
+/* على الشاشات الصغيرة فقط ننزل لعمود واحد */
+@media (max-width: 920px){
+  .page{ grid-template-columns: 1fr; }
 }
 .twoCol{
   display:grid;
