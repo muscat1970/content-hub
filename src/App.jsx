@@ -80,10 +80,19 @@ const copyToClipboard = async (text) => {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
+    // iOS-friendly fallback
     const ta = document.createElement("textarea");
     ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.left = "-1000px";
     document.body.appendChild(ta);
+    ta.focus();
     ta.select();
+    try {
+      ta.setSelectionRange(0, ta.value.length);
+    } catch {}
     document.execCommand("copy");
     document.body.removeChild(ta);
   }
@@ -111,9 +120,25 @@ const I = {
   ),
   Enter: (p) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path d="M10 17l-4-5 4-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M6 12h10a3 3 0 0 1 3 3v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M19 8V5a2 2 0 0 0-2-2H6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M10 17l-4-5 4-5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 12h10a3 3 0 0 1 3 3v3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M19 8V5a2 2 0 0 0-2-2H6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
     </svg>
   ),
   Edit: (p) => (
@@ -148,9 +173,19 @@ const I = {
   ),
   Image: (p) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6Z" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
       <path d="M8 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M21 16l-6-6-6 7-2-2-3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M21 16l-6-6-6 7-2-2-3 3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   ),
   Text: (p) => (
@@ -198,7 +233,12 @@ const I = {
   Sun: (p) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
       <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
     </svg>
   ),
   Moon: (p) => (
@@ -231,8 +271,19 @@ const parseSegments = (t) => {
   return out;
 };
 
-const TweetPreview = ({ text, timeLabel }) => {
+const TweetPreview = ({ text, timeLabel, clampLines = null }) => {
   const segs = useMemo(() => parseSegments(text), [text]);
+
+  const clampStyle =
+    clampLines && clampLines > 0
+      ? {
+          display: "-webkit-box",
+          WebkitLineClamp: clampLines,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }
+      : null;
+
   return (
     <div className="tweet">
       <div className="tweetAvatar" aria-hidden="true" />
@@ -243,7 +294,7 @@ const TweetPreview = ({ text, timeLabel }) => {
           <div className="tweetDot">•</div>
           <div className="tweetTime">{timeLabel}</div>
         </div>
-        <div className="tweetText">
+        <div className="tweetText" style={clampStyle}>
           {segs.map((s, i) =>
             s.k === "t" ? (
               <span key={i}>{s.v}</span>
@@ -268,10 +319,19 @@ const TweetPreview = ({ text, timeLabel }) => {
 };
 
 /* =========================
+   Media helpers
+========================= */
+const ImgWithFallback = ({ src, className, alt = "" }) => {
+  const [bad, setBad] = useState(false);
+  if (!src || bad) return <div className={`${className} todayImgPh`}>لا توجد صورة</div>;
+  return <img className={className} src={src} alt={alt} loading="lazy" onError={() => setBad(true)} />;
+};
+
+/* =========================
    Data model + migrate
 ========================= */
 const seedData = {
-  version: 7,
+  version: 8,
   xLimit: X_LIMIT_DEFAULT,
   categories: [
     { id: TODAY_ID, name: TODAY_NAME, system: true },
@@ -289,14 +349,18 @@ const normTexts = (m) =>
   Object.fromEntries(
     Object.entries(m || {}).map(([k, arr]) => [
       k,
-      (arr || []).map((t) => ({
-        id: t.id ?? uid("t"),
-        text: t.text ?? "",
-        createdAt: t.createdAt ?? Date.now(),
-        lastUsedAt: t.lastUsedAt ?? null,
-        usedCount: t.usedCount ?? 0,
-        pinned: t.pinned ?? false,
-      })),
+      (arr || []).map((t) => {
+        const text = t.text ?? "";
+        return {
+          id: t.id ?? uid("t"),
+          text,
+          canonText: t.canonText ?? canon(text),
+          createdAt: t.createdAt ?? Date.now(),
+          lastUsedAt: t.lastUsedAt ?? null,
+          usedCount: t.usedCount ?? 0,
+          pinned: t.pinned ?? false,
+        };
+      }),
     ])
   );
 
@@ -315,6 +379,34 @@ const normImgs = (m) =>
     ])
   );
 
+const normTrashTexts = (arr) =>
+  (arr || []).map((t) => {
+    const text = t.text ?? "";
+    return {
+      id: t.id ?? uid("t"),
+      text,
+      canonText: t.canonText ?? canon(text),
+      createdAt: t.createdAt ?? Date.now(),
+      lastUsedAt: t.lastUsedAt ?? null,
+      usedCount: t.usedCount ?? 0,
+      pinned: t.pinned ?? false,
+      deletedAt: t.deletedAt ?? Date.now(),
+      fromCategoryId: t.fromCategoryId ?? null,
+    };
+  });
+
+const normTrashImages = (arr) =>
+  (arr || []).map((i) => ({
+    id: i.id ?? uid("i"),
+    url: i.url ?? "",
+    createdAt: i.createdAt ?? Date.now(),
+    lastUsedAt: i.lastUsedAt ?? null,
+    usedCount: i.usedCount ?? 0,
+    pinned: i.pinned ?? false,
+    deletedAt: i.deletedAt ?? Date.now(),
+    fromCategoryId: i.fromCategoryId ?? null,
+  }));
+
 const migrate = (raw) => {
   if (!raw || !raw.textsByCategory || !raw.imagesByCategory) return seedData;
 
@@ -322,13 +414,18 @@ const migrate = (raw) => {
   const hasToday = cats.some((c) => c.id === TODAY_ID);
   const categories = hasToday ? cats : [{ id: TODAY_ID, name: TODAY_NAME, system: true }, ...cats];
 
+  const trash = raw.trash ?? { texts: [], images: [] };
+
   return {
-    version: 7,
+    version: 8,
     xLimit: raw.xLimit ?? X_LIMIT_DEFAULT,
     categories,
     textsByCategory: normTexts(raw.textsByCategory),
     imagesByCategory: normImgs(raw.imagesByCategory),
-    trash: raw.trash ?? { texts: [], images: [] },
+    trash: {
+      texts: normTrashTexts(trash.texts),
+      images: normTrashImages(trash.images),
+    },
   };
 };
 
@@ -348,10 +445,31 @@ function useElementSize(ref) {
   return h;
 }
 
-const VirtualList = ({ items, estimate = 240, overscan = 6, className = "", render }) => {
+/**
+ * apiRef.current = { scrollToIndex(index) }
+ */
+const VirtualList = ({ items, estimate = 240, overscan = 6, className = "", render, apiRef }) => {
   const scrollerRef = useRef(null);
   const height = useElementSize(scrollerRef);
   const [scrollTop, setScrollTop] = useState(0);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+
+    const api = {
+      scrollToIndex: (index, behavior = "auto") => {
+        const i = clamp(index ?? 0, 0, Math.max(0, items.length - 1));
+        el.scrollTo({ top: i * estimate, behavior });
+      },
+      getScroller: () => el,
+    };
+
+    if (apiRef) apiRef.current = api;
+    return () => {
+      if (apiRef) apiRef.current = null;
+    };
+  }, [apiRef, estimate, items.length]);
 
   useEffect(() => {
     const el = scrollerRef.current;
@@ -454,6 +572,105 @@ const ToastUndo = ({ show, label, onUndo, onClose }) => {
   );
 };
 
+const TrashModal = ({
+  open,
+  tab,
+  onTab,
+  onClose,
+  data,
+  categories,
+  restoreFromTrash,
+  deleteForever,
+  clearTrash,
+}) => {
+  if (!open) return null;
+
+  return (
+    <div className="modalOverlay" onMouseDown={onClose}>
+      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modalHeader">
+          <div className="modalTitle">سلة المحذوفات</div>
+          <button className="btn iconOnly" onClick={onClose} title="إغلاق" type="button">
+            ✕
+          </button>
+        </div>
+
+        <div className="trashTabs">
+          <button className={`tabBtn ${tab === "texts" ? "active" : ""}`} onClick={() => onTab("texts")} type="button">
+            نصوص
+          </button>
+          <button className={`tabBtn ${tab === "images" ? "active" : ""}`} onClick={() => onTab("images")} type="button">
+            صور
+          </button>
+        </div>
+
+        <div className="trashTools">
+          <button className="btn danger" onClick={() => clearTrash(tab)} type="button">
+            تفريغ
+          </button>
+        </div>
+
+        <div className="trashList">
+          {tab === "texts" ? (
+            (data.trash?.texts || []).length === 0 ? (
+              <div className="meta">—</div>
+            ) : (
+              (data.trash?.texts || [])
+                .slice()
+                .sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0))
+                .map((t) => (
+                  <div key={t.id} className="trashItem">
+                    <div className="trashMain">
+                      <div className="trashTitle">
+                        {(t.text || "").slice(0, 90)}
+                        {(t.text || "").length > 90 ? "…" : ""}
+                      </div>
+                      <div className="meta">
+                        حُذف: {fmt(t.deletedAt)} • من: {categories.find((c) => c.id === t.fromCategoryId)?.name ?? "—"}
+                      </div>
+                    </div>
+                    <div className="trashActions">
+                      <button className="btn" onClick={() => restoreFromTrash("texts", t.id)} type="button">
+                        استرجاع
+                      </button>
+                      <button className="btn danger" onClick={() => deleteForever("texts", t.id)} type="button">
+                        حذف نهائي
+                      </button>
+                    </div>
+                  </div>
+                ))
+            )
+          ) : (data.trash?.images || []).length === 0 ? (
+            <div className="meta">—</div>
+          ) : (
+            (data.trash?.images || [])
+              .slice()
+              .sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0))
+              .map((img) => (
+                <div key={img.id} className="trashItem">
+                  <div className="trashMain">
+                    <div className="trashTitle">{img.url}</div>
+                    <div className="meta">
+                      حُذفت: {fmt(img.deletedAt)} • من: {categories.find((c) => c.id === img.fromCategoryId)?.name ?? "—"}
+                    </div>
+                  </div>
+                  <div className="trashActions">
+                    <button className="btn" onClick={() => restoreFromTrash("images", img.id)} type="button">
+                      استرجاع
+                    </button>
+                    <button className="btn danger" onClick={() => deleteForever("images", img.id)} type="button">
+                      حذف نهائي
+                    </button>
+                  </div>
+                </div>
+              ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* =========================
    App
 ========================= */
@@ -527,6 +744,9 @@ export default function App() {
 
   const importRef = useRef(null);
 
+  /* ---------- Virtual API refs ---------- */
+  const textsListApiRef = useRef(null);
+
   /* =========================
      Derived
   ========================= */
@@ -553,7 +773,7 @@ export default function App() {
   const duplicateIds = useMemo(() => {
     const m = new Map();
     for (const t of rawTexts) {
-      const c = canon(t.text);
+      const c = t.canonText ?? canon(t.text);
       if (!m.has(c)) m.set(c, []);
       m.get(c).push(t.id);
     }
@@ -570,14 +790,30 @@ export default function App() {
 
   const images = useMemo(() => sortPinnedFirst(rawImages, sortImages), [rawImages, sortImages]);
 
+  // TODAY (fixed): choose "Top" as: pinned first, then mostUsed, then newest
+  const pickTop = (arr, take) => {
+    const a = [...(arr || [])];
+    a.sort((x, y) => {
+      if (!!y.pinned !== !!x.pinned) return y.pinned ? 1 : -1;
+      const u = (y.usedCount ?? 0) - (x.usedCount ?? 0);
+      if (u) return u;
+      const lu = (y.lastUsedAt ?? 0) - (x.lastUsedAt ?? 0);
+      if (lu) return lu;
+      return (y.createdAt ?? 0) - (x.createdAt ?? 0);
+    });
+    return a.slice(0, take);
+  };
+
   const todaySections = useMemo(() => {
     const realCats = categories.filter((c) => c.id !== TODAY_ID);
     const out = [];
     for (const c of realCats) {
       const tArr = data.textsByCategory?.[c.id] || [];
       const iArr = data.imagesByCategory?.[c.id] || [];
-      const takeT = tArr.slice(0, TODAY_TAKE);
-      const takeI = iArr.slice(0, TODAY_TAKE);
+
+      const takeT = pickTop(tArr, TODAY_TAKE);
+      const takeI = pickTop(iArr, TODAY_TAKE);
+
       const posts = [];
       const n = Math.max(takeT.length, takeI.length, TODAY_TAKE);
       for (let k = 0; k < n; k++) {
@@ -619,7 +855,7 @@ export default function App() {
      Backup
   ========================= */
   const exportBackup = () => {
-    const blob = new Blob([JSON.stringify({ ...data, version: 7 }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ ...data, version: 8 }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `content-hub-backup-${new Date().toISOString().slice(0, 10)}.json`;
@@ -686,8 +922,14 @@ export default function App() {
       const tArr = textsByCategory[id] || [];
       const iArr = imagesByCategory[id] || [];
       const trash = {
-        texts: [...(p.trash?.texts || []), ...tArr.map((t) => ({ ...t, deletedAt: Date.now(), fromCategoryId: id }))],
-        images: [...(p.trash?.images || []), ...iArr.map((i) => ({ ...i, deletedAt: Date.now(), fromCategoryId: id }))],
+        texts: [
+          ...(p.trash?.texts || []),
+          ...tArr.map((t) => ({ ...t, deletedAt: Date.now(), fromCategoryId: id })),
+        ],
+        images: [
+          ...(p.trash?.images || []),
+          ...iArr.map((i) => ({ ...i, deletedAt: Date.now(), fromCategoryId: id })),
+        ],
       };
 
       delete textsByCategory[id];
@@ -768,12 +1010,21 @@ export default function App() {
 
     const curArr = data.textsByCategory?.[activeCategoryId] || [];
     const cNew = canon(text);
-    const exact = curArr.some((t) => canon(t.text) === cNew);
+    const exact = curArr.some((t) => (t.canonText ?? canon(t.text)) === cNew);
     const near = curArr.slice(0, 40).some((t) => jaccard(t.text, text) >= 0.9);
 
     if ((exact || near) && !confirm("هناك نص مشابه/مكرر. هل تريد الإضافة على أي حال؟")) return false;
 
-    const item = { id: uid("t"), text, createdAt: Date.now(), lastUsedAt: null, usedCount: 0, pinned: false };
+    const item = {
+      id: uid("t"),
+      text,
+      canonText: cNew,
+      createdAt: Date.now(),
+      lastUsedAt: null,
+      usedCount: 0,
+      pinned: false,
+    };
+
     setData((p) => {
       const cur = p.textsByCategory?.[activeCategoryId] || [];
       return { ...p, textsByCategory: { ...(p.textsByCategory || {}), [activeCategoryId]: [item, ...cur] } };
@@ -825,13 +1076,14 @@ export default function App() {
   const saveEditText = (catId, id) => {
     const v = editingTextValue.trim();
     if (!v) return;
+    const cV = canon(v);
     setData((p) => {
       const cur = p.textsByCategory?.[catId] || [];
       return {
         ...p,
         textsByCategory: {
           ...(p.textsByCategory || {}),
-          [catId]: cur.map((t) => (t.id === id ? { ...t, text: v } : t)),
+          [catId]: cur.map((t) => (t.id === id ? { ...t, text: v, canonText: cV } : t)),
         },
       };
     });
@@ -863,7 +1115,10 @@ export default function App() {
   };
 
   const applyBulk = () => {
-    const lines = bulkText.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    const lines = bulkText
+      .split(/\r?\n/)
+      .map((x) => x.trim())
+      .filter(Boolean);
     if (!lines.length) return;
     let added = 0;
     for (const l of lines) if (addTextOne(l)) added++;
@@ -879,6 +1134,14 @@ export default function App() {
     if (!activeCategoryId || isToday) return;
     const url = newImageUrl.trim();
     if (!url) return;
+    try {
+      // basic validation
+      const u = new URL(url);
+      if (!(u.protocol === "http:" || u.protocol === "https:")) throw new Error("bad");
+    } catch {
+      return alert("الرابط غير صالح. استخدم رابط يبدأ بـ http/https");
+    }
+
     const item = { id: uid("i"), url, createdAt: Date.now(), lastUsedAt: null, usedCount: 0, pinned: false };
     setData((p) => {
       const cur = p.imagesByCategory?.[activeCategoryId] || [];
@@ -927,6 +1190,12 @@ export default function App() {
   const saveEditImage = (catId, id) => {
     const v = editingImageValue.trim();
     if (!v) return;
+    try {
+      const u = new URL(v);
+      if (!(u.protocol === "http:" || u.protocol === "https:")) throw new Error("bad");
+    } catch {
+      return alert("الرابط غير صالح. استخدم رابط يبدأ بـ http/https");
+    }
     setData((p) => {
       const cur = p.imagesByCategory?.[catId] || [];
       return {
@@ -995,7 +1264,10 @@ export default function App() {
           const rest = src.filter((t) => !ids.includes(t.id));
           next.textsByCategory = { ...(next.textsByCategory || {}), [activeCategoryId]: rest };
           next.trash = {
-            texts: [...(next.trash?.texts || []), ...picked.map((t) => ({ ...t, deletedAt: Date.now(), fromCategoryId: activeCategoryId }))],
+            texts: [
+              ...(next.trash?.texts || []),
+              ...picked.map((t) => ({ ...t, deletedAt: Date.now(), fromCategoryId: activeCategoryId })),
+            ],
             images: next.trash?.images || [],
           };
           return next;
@@ -1006,7 +1278,10 @@ export default function App() {
           next.imagesByCategory = { ...(next.imagesByCategory || {}), [activeCategoryId]: rest };
           next.trash = {
             texts: next.trash?.texts || [],
-            images: [...(next.trash?.images || []), ...picked.map((i) => ({ ...i, deletedAt: Date.now(), fromCategoryId: activeCategoryId }))],
+            images: [
+              ...(next.trash?.images || []),
+              ...picked.map((i) => ({ ...i, deletedAt: Date.now(), fromCategoryId: activeCategoryId })),
+            ],
           };
           return next;
         }
@@ -1023,7 +1298,15 @@ export default function App() {
         const picked = src.filter((t) => ids.includes(t.id));
         const rest = src.filter((t) => !ids.includes(t.id));
         const dst = next.textsByCategory?.[targetCategoryId] || [];
-        const ins = action === "copy" ? picked.map((t) => ({ ...t, id: uid("t"), createdAt: Date.now(), pinned: false })) : picked;
+        const ins =
+          action === "copy"
+            ? picked.map((t) => ({
+                ...t,
+                id: uid("t"),
+                createdAt: Date.now(),
+                pinned: false,
+              }))
+            : picked;
         next.textsByCategory = {
           ...(next.textsByCategory || {}),
           [activeCategoryId]: action === "move" ? rest : src,
@@ -1035,7 +1318,15 @@ export default function App() {
         const picked = src.filter((i) => ids.includes(i.id));
         const rest = src.filter((i) => !ids.includes(i.id));
         const dst = next.imagesByCategory?.[targetCategoryId] || [];
-        const ins = action === "copy" ? picked.map((i) => ({ ...i, id: uid("i"), createdAt: Date.now(), pinned: false })) : picked;
+        const ins =
+          action === "copy"
+            ? picked.map((i) => ({
+                ...i,
+                id: uid("i"),
+                createdAt: Date.now(),
+                pinned: false,
+              }))
+            : picked;
         next.imagesByCategory = {
           ...(next.imagesByCategory || {}),
           [activeCategoryId]: action === "move" ? rest : src,
@@ -1049,7 +1340,7 @@ export default function App() {
   };
 
   /* =========================
-     Keyboard shortcuts (fixed + safe)
+     Keyboard shortcuts (fixed for virtualization)
   ========================= */
   const textsRef = useRef([]);
   const activeTextIndexRef = useRef(0);
@@ -1092,12 +1383,8 @@ export default function App() {
         setActiveTextIndex((i) => {
           const curTexts = textsRef.current || [];
           const next = clamp(i + dir, 0, Math.max(0, curTexts.length - 1));
-          const id = curTexts[next]?.id;
-          if (id) {
-            requestAnimationFrame(() => {
-              document.querySelector(`[data-text="${id}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-            });
-          }
+          // Scroll using virtualization API (no querySelector)
+          textsListApiRef.current?.scrollToIndex?.(next, "auto");
           return next;
         });
       }
@@ -1120,7 +1407,10 @@ export default function App() {
         const restored = { ...item };
         delete restored.deletedAt;
         delete restored.fromCategoryId;
-        next.trash = { texts: (next.trash?.texts || []).filter((x) => x.id !== itemId), images: next.trash?.images || [] };
+        next.trash = {
+          texts: (next.trash?.texts || []).filter((x) => x.id !== itemId),
+          images: next.trash?.images || [],
+        };
         const cur = next.textsByCategory?.[from] || [];
         next.textsByCategory = { ...(next.textsByCategory || {}), [from]: [restored, ...cur] };
         return next;
@@ -1131,7 +1421,10 @@ export default function App() {
       const restored = { ...item };
       delete restored.deletedAt;
       delete restored.fromCategoryId;
-      next.trash = { texts: next.trash?.texts || [], images: (next.trash?.images || []).filter((x) => x.id !== itemId) };
+      next.trash = {
+        texts: next.trash?.texts || [],
+        images: (next.trash?.images || []).filter((x) => x.id !== itemId),
+      };
       const cur = next.imagesByCategory?.[from] || [];
       next.imagesByCategory = { ...(next.imagesByCategory || {}), [from]: [restored, ...cur] };
       return next;
@@ -1253,7 +1546,15 @@ export default function App() {
 
           <div className="actions">
             {ThemeBtn}
-            <button className="btn" onClick={() => { setTrashTab("texts"); setTrashOpen(true); }} title="السلة" type="button">
+            <button
+              className="btn"
+              onClick={() => {
+                setTrashTab("texts");
+                setTrashOpen(true);
+              }}
+              title="السلة"
+              type="button"
+            >
               <I.Trash style={{ width: 18, height: 18 }} /> السلة
             </button>
             <button className="btn" onClick={exportBackup} title="تصدير" type="button">
@@ -1265,7 +1566,13 @@ export default function App() {
             <button className="btn danger" onClick={logout} title="خروج" type="button">
               خروج
             </button>
-            <input ref={importRef} type="file" accept="application/json" style={{ display: "none" }} onChange={(e) => importBackup(e.target.files?.[0])} />
+            <input
+              ref={importRef}
+              type="file"
+              accept="application/json"
+              style={{ display: "none" }}
+              onChange={(e) => importBackup(e.target.files?.[0])}
+            />
           </div>
         </header>
 
@@ -1326,7 +1633,15 @@ export default function App() {
                     {!isEditing ? (
                       <>
                         {!isSystem && (
-                          <button className="btn iconOnly" onClick={() => { setEditingCatId(cat.id); setEditingCatName(cat.name); }} title="تعديل" type="button">
+                          <button
+                            className="btn iconOnly"
+                            onClick={() => {
+                              setEditingCatId(cat.id);
+                              setEditingCatName(cat.name);
+                            }}
+                            title="تعديل"
+                            type="button"
+                          >
                             <I.Edit />
                           </button>
                         )}
@@ -1350,91 +1665,17 @@ export default function App() {
 
         <div className="footer">اختصارات داخل المجموعة: Ctrl+C للنسخ • ↑↓ للتنقل</div>
 
-        {/* Trash Modal */}
-        {trashOpen && (
-          <div className="modalOverlay" onMouseDown={() => setTrashOpen(false)}>
-            <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-              <div className="modalHeader">
-                <div className="modalTitle">سلة المحذوفات</div>
-                <button className="btn iconOnly" onClick={() => setTrashOpen(false)} title="إغلاق" type="button">
-                  ✕
-                </button>
-              </div>
-
-              <div className="trashTabs">
-                <button className={`tabBtn ${trashTab === "texts" ? "active" : ""}`} onClick={() => setTrashTab("texts")} type="button">
-                  نصوص
-                </button>
-                <button className={`tabBtn ${trashTab === "images" ? "active" : ""}`} onClick={() => setTrashTab("images")} type="button">
-                  صور
-                </button>
-              </div>
-
-              <div className="trashTools">
-                <button className="btn danger" onClick={() => clearTrash(trashTab)} type="button">
-                  تفريغ
-                </button>
-              </div>
-
-              <div className="trashList">
-                {trashTab === "texts" ? (
-                  (data.trash?.texts || []).length === 0 ? (
-                    <div className="meta">—</div>
-                  ) : (
-                    (data.trash?.texts || [])
-                      .slice()
-                      .sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0))
-                      .map((t) => (
-                        <div key={t.id} className="trashItem">
-                          <div className="trashMain">
-                            <div className="trashTitle">
-                              {(t.text || "").slice(0, 90)}
-                              {(t.text || "").length > 90 ? "…" : ""}
-                            </div>
-                            <div className="meta">
-                              حُذف: {fmt(t.deletedAt)} • من: {(categories.find((c) => c.id === t.fromCategoryId)?.name) ?? "—"}
-                            </div>
-                          </div>
-                          <div className="trashActions">
-                            <button className="btn" onClick={() => restoreFromTrash("texts", t.id)} type="button">
-                              استرجاع
-                            </button>
-                            <button className="btn danger" onClick={() => deleteForever("texts", t.id)} type="button">
-                              حذف نهائي
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                  )
-                ) : (data.trash?.images || []).length === 0 ? (
-                  <div className="meta">—</div>
-                ) : (
-                  (data.trash?.images || [])
-                    .slice()
-                    .sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0))
-                    .map((img) => (
-                      <div key={img.id} className="trashItem">
-                        <div className="trashMain">
-                          <div className="trashTitle">{img.url}</div>
-                          <div className="meta">
-                            حُذفت: {fmt(img.deletedAt)} • من: {(categories.find((c) => c.id === img.fromCategoryId)?.name) ?? "—"}
-                          </div>
-                        </div>
-                        <div className="trashActions">
-                          <button className="btn" onClick={() => restoreFromTrash("images", img.id)} type="button">
-                            استرجاع
-                          </button>
-                          <button className="btn danger" onClick={() => deleteForever("images", img.id)} type="button">
-                            حذف نهائي
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        <TrashModal
+          open={trashOpen}
+          tab={trashTab}
+          onTab={setTrashTab}
+          onClose={() => setTrashOpen(false)}
+          data={data}
+          categories={categories}
+          restoreFromTrash={restoreFromTrash}
+          deleteForever={deleteForever}
+          clearTrash={clearTrash}
+        />
 
         <ToastUndo show={!!undoState} label={undoState?.label} onUndo={undoLastDelete} onClose={closeUndo} />
       </div>
@@ -1457,19 +1698,39 @@ export default function App() {
             </button>
             <div>
               <div className="title">{TODAY_NAME}</div>
-              <div className="subtitle">منشورين من كل مجموعة (نص + صورة) — الاستخدام ينزّلها في مجموعتها</div>
+              <div className="subtitle">الأعلى: مثبّت أولاً • الأكثر استخدامًا • الأحدث</div>
             </div>
           </div>
 
           <div className="actions">
             {ThemeBtn}
-            <button className="btn" onClick={() => { setTrashTab("texts"); setTrashOpen(true); }} title="السلة" type="button">
+            <button
+              className="btn"
+              onClick={() => {
+                setTrashTab("texts");
+                setTrashOpen(true);
+              }}
+              title="السلة"
+              type="button"
+            >
               <I.Trash style={{ width: 18, height: 18 }} /> السلة
             </button>
-            <button className="btn" onClick={exportBackup} title="تصدير" type="button"><I.Download style={{ width: 18, height: 18 }} /></button>
-            <button className="btn" onClick={openImport} title="استيراد" type="button"><I.Upload style={{ width: 18, height: 18 }} /></button>
-            <button className="btn danger" onClick={logout} title="خروج" type="button">خروج</button>
-            <input ref={importRef} type="file" accept="application/json" style={{ display: "none" }} onChange={(e) => importBackup(e.target.files?.[0])} />
+            <button className="btn" onClick={exportBackup} title="تصدير" type="button">
+              <I.Download style={{ width: 18, height: 18 }} />
+            </button>
+            <button className="btn" onClick={openImport} title="استيراد" type="button">
+              <I.Upload style={{ width: 18, height: 18 }} />
+            </button>
+            <button className="btn danger" onClick={logout} title="خروج" type="button">
+              خروج
+            </button>
+            <input
+              ref={importRef}
+              type="file"
+              accept="application/json"
+              style={{ display: "none" }}
+              onChange={(e) => importBackup(e.target.files?.[0])}
+            />
           </div>
         </header>
 
@@ -1488,11 +1749,7 @@ export default function App() {
                   {sec.posts.map((p) => (
                     <div key={p.key} className="todayPost">
                       <div className="todayMedia">
-                        {p.image?.url ? (
-                          <img className="todayImg" src={p.image.url} alt="" onError={(e) => (e.currentTarget.style.display = "none")} loading="lazy" />
-                        ) : (
-                          <div className="todayImgPh">لا توجد صورة</div>
-                        )}
+                        <ImgWithFallback src={p.image?.url} className="todayImg" />
                       </div>
 
                       <div className="todayBody">
@@ -1522,12 +1779,16 @@ export default function App() {
                           {p.text ? (
                             <>
                               نص: {p.text.usedCount || 0} استخدام • آخر: {fmt(p.text.lastUsedAt)}
+                              {p.text.pinned ? <span className="dot">•</span> : null}
+                              {p.text.pinned ? <span>مثبّت</span> : null}
                             </>
                           ) : null}
                           {p.text && p.image ? <span className="dot">•</span> : null}
                           {p.image ? (
                             <>
                               صورة: {p.image.usedCount || 0} استخدام • آخر: {fmt(p.image.lastUsedAt)}
+                              {p.image.pinned ? <span className="dot">•</span> : null}
+                              {p.image.pinned ? <span>مثبّت</span> : null}
                             </>
                           ) : null}
                         </div>
@@ -1540,76 +1801,17 @@ export default function App() {
           )}
         </div>
 
-        {/* Trash Modal */}
-        {trashOpen && (
-          <div className="modalOverlay" onMouseDown={() => setTrashOpen(false)}>
-            <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-              <div className="modalHeader">
-                <div className="modalTitle">سلة المحذوفات</div>
-                <button className="btn iconOnly" onClick={() => setTrashOpen(false)} title="إغلاق" type="button">
-                  ✕
-                </button>
-              </div>
-
-              <div className="trashTabs">
-                <button className={`tabBtn ${trashTab === "texts" ? "active" : ""}`} onClick={() => setTrashTab("texts")} type="button">
-                  نصوص
-                </button>
-                <button className={`tabBtn ${trashTab === "images" ? "active" : ""}`} onClick={() => setTrashTab("images")} type="button">
-                  صور
-                </button>
-              </div>
-
-              <div className="trashTools">
-                <button className="btn danger" onClick={() => clearTrash(trashTab)} type="button">
-                  تفريغ
-                </button>
-              </div>
-
-              <div className="trashList">
-                {trashTab === "texts" ? (
-                  (data.trash?.texts || []).length === 0 ? (
-                    <div className="meta">—</div>
-                  ) : (
-                    (data.trash?.texts || [])
-                      .slice()
-                      .sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0))
-                      .map((t) => (
-                        <div key={t.id} className="trashItem">
-                          <div className="trashMain">
-                            <div className="trashTitle">{(t.text || "").slice(0, 90)}{(t.text || "").length > 90 ? "…" : ""}</div>
-                            <div className="meta">حُذف: {fmt(t.deletedAt)} • من: {(categories.find((c) => c.id === t.fromCategoryId)?.name) ?? "—"}</div>
-                          </div>
-                          <div className="trashActions">
-                            <button className="btn" onClick={() => restoreFromTrash("texts", t.id)} type="button">استرجاع</button>
-                            <button className="btn danger" onClick={() => deleteForever("texts", t.id)} type="button">حذف نهائي</button>
-                          </div>
-                        </div>
-                      ))
-                  )
-                ) : (data.trash?.images || []).length === 0 ? (
-                  <div className="meta">—</div>
-                ) : (
-                  (data.trash?.images || [])
-                    .slice()
-                    .sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0))
-                    .map((img) => (
-                      <div key={img.id} className="trashItem">
-                        <div className="trashMain">
-                          <div className="trashTitle">{img.url}</div>
-                          <div className="meta">حُذفت: {fmt(img.deletedAt)} • من: {(categories.find((c) => c.id === img.fromCategoryId)?.name) ?? "—"}</div>
-                        </div>
-                        <div className="trashActions">
-                          <button className="btn" onClick={() => restoreFromTrash("images", img.id)} type="button">استرجاع</button>
-                          <button className="btn danger" onClick={() => deleteForever("images", img.id)} type="button">حذف نهائي</button>
-                        </div>
-                      </div>
-                    ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        <TrashModal
+          open={trashOpen}
+          tab={trashTab}
+          onTab={setTrashTab}
+          onClose={() => setTrashOpen(false)}
+          data={data}
+          categories={categories}
+          restoreFromTrash={restoreFromTrash}
+          deleteForever={deleteForever}
+          clearTrash={clearTrash}
+        />
 
         <ToastUndo show={!!undoState} label={undoState?.label} onUndo={undoLastDelete} onClose={closeUndo} />
       </div>
@@ -1651,7 +1853,15 @@ export default function App() {
             </IconToggle>
           </div>
 
-          <button className="btn" onClick={() => { setTrashTab("texts"); setTrashOpen(true); }} title="السلة" type="button">
+          <button
+            className="btn"
+            onClick={() => {
+              setTrashTab("texts");
+              setTrashOpen(true);
+            }}
+            title="السلة"
+            type="button"
+          >
             <I.Trash style={{ width: 18, height: 18 }} /> السلة
           </button>
 
@@ -1665,7 +1875,13 @@ export default function App() {
           <button className="btn danger" onClick={logout} title="خروج" type="button">
             خروج
           </button>
-          <input ref={importRef} type="file" accept="application/json" style={{ display: "none" }} onChange={(e) => importBackup(e.target.files?.[0])} />
+          <input
+            ref={importRef}
+            type="file"
+            accept="application/json"
+            style={{ display: "none" }}
+            onChange={(e) => importBackup(e.target.files?.[0])}
+          />
         </div>
       </header>
 
@@ -1702,7 +1918,13 @@ export default function App() {
             )}
 
             <div className="row">
-              <input className="input" placeholder="رابط صورة…" value={newImageUrl} onChange={(e) => setNewImageUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addImage()} />
+              <input
+                className="input"
+                placeholder="رابط صورة…"
+                value={newImageUrl}
+                onChange={(e) => setNewImageUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addImage()}
+              />
               <button className="btn primary iconOnly" onClick={addImage} disabled={!newImageUrl.trim()} title="إضافة" type="button">
                 <I.Plus />
               </button>
@@ -1739,7 +1961,8 @@ export default function App() {
                         </button>
                       </div>
 
-                      <img className="thumbImg" src={img.url} alt="" onError={(e) => (e.currentTarget.style.display = "none")} loading="lazy" />
+                      {/* better fallback: keep layout stable */}
+                      <ImgWithFallback src={img.url} className="thumbImg" />
 
                       {img.pinned && <div className="pinBadge">مثبّت</div>}
 
@@ -1851,6 +2074,8 @@ export default function App() {
                 onChange={(e) => {
                   setSearchText(e.target.value);
                   setActiveTextIndex(0);
+                  // keep list aligned with new index
+                  textsListApiRef.current?.scrollToIndex?.(0, "auto");
                 }}
               />
               <div className="kbd">
@@ -1864,6 +2089,7 @@ export default function App() {
               </div>
             ) : (
               <VirtualList
+                apiRef={textsListApiRef}
                 items={texts}
                 estimate={310}
                 overscan={6}
@@ -1916,7 +2142,8 @@ export default function App() {
                           </div>
                         </div>
                       ) : (
-                        <TweetPreview text={t.text} timeLabel={t.lastUsedAt ? fmt(t.lastUsedAt) : "—"} />
+                        // clamp to reduce variable height (better virtualization stability)
+                        <TweetPreview text={t.text} timeLabel={t.lastUsedAt ? fmt(t.lastUsedAt) : "—"} clampLines={5} />
                       )}
 
                       <div className="metaActionRow">
@@ -1973,7 +2200,13 @@ export default function App() {
             <div className="meta" style={{ marginTop: 6 }}>
               ضع كل نص في سطر مستقل.
             </div>
-            <textarea className="textarea" style={{ marginTop: 10, minHeight: 180 }} placeholder={"نص 1\nنص 2\nنص 3 ..."} value={bulkText} onChange={(e) => setBulkText(e.target.value)} />
+            <textarea
+              className="textarea"
+              style={{ marginTop: 10, minHeight: 180 }}
+              placeholder={"نص 1\nنص 2\nنص 3 ..."}
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+            />
             <div className="row space" style={{ marginTop: 12 }}>
               <button className="btn" onClick={() => setBulkOpen(false)} type="button">
                 إلغاء
@@ -1986,76 +2219,17 @@ export default function App() {
         </div>
       )}
 
-      {/* Trash Modal */}
-      {trashOpen && (
-        <div className="modalOverlay" onMouseDown={() => setTrashOpen(false)}>
-          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="modalHeader">
-              <div className="modalTitle">سلة المحذوفات</div>
-              <button className="btn iconOnly" onClick={() => setTrashOpen(false)} title="إغلاق" type="button">
-                ✕
-              </button>
-            </div>
-
-            <div className="trashTabs">
-              <button className={`tabBtn ${trashTab === "texts" ? "active" : ""}`} onClick={() => setTrashTab("texts")} type="button">
-                نصوص
-              </button>
-              <button className={`tabBtn ${trashTab === "images" ? "active" : ""}`} onClick={() => setTrashTab("images")} type="button">
-                صور
-              </button>
-            </div>
-
-            <div className="trashTools">
-              <button className="btn danger" onClick={() => clearTrash(trashTab)} type="button">
-                تفريغ
-              </button>
-            </div>
-
-            <div className="trashList">
-              {trashTab === "texts" ? (
-                (data.trash?.texts || []).length === 0 ? (
-                  <div className="meta">—</div>
-                ) : (
-                  (data.trash?.texts || [])
-                    .slice()
-                    .sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0))
-                    .map((t) => (
-                      <div key={t.id} className="trashItem">
-                        <div className="trashMain">
-                          <div className="trashTitle">{(t.text || "").slice(0, 90)}{(t.text || "").length > 90 ? "…" : ""}</div>
-                          <div className="meta">حُذف: {fmt(t.deletedAt)} • من: {(categories.find((c) => c.id === t.fromCategoryId)?.name) ?? "—"}</div>
-                        </div>
-                        <div className="trashActions">
-                          <button className="btn" onClick={() => restoreFromTrash("texts", t.id)} type="button">استرجاع</button>
-                          <button className="btn danger" onClick={() => deleteForever("texts", t.id)} type="button">حذف نهائي</button>
-                        </div>
-                      </div>
-                    ))
-                )
-              ) : (data.trash?.images || []).length === 0 ? (
-                <div className="meta">—</div>
-              ) : (
-                (data.trash?.images || [])
-                  .slice()
-                  .sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0))
-                  .map((img) => (
-                    <div key={img.id} className="trashItem">
-                      <div className="trashMain">
-                        <div className="trashTitle">{img.url}</div>
-                        <div className="meta">حُذفت: {fmt(img.deletedAt)} • من: {(categories.find((c) => c.id === img.fromCategoryId)?.name) ?? "—"}</div>
-                      </div>
-                      <div className="trashActions">
-                        <button className="btn" onClick={() => restoreFromTrash("images", img.id)} type="button">استرجاع</button>
-                        <button className="btn danger" onClick={() => deleteForever("images", img.id)} type="button">حذف نهائي</button>
-                      </div>
-                    </div>
-                  ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <TrashModal
+        open={trashOpen}
+        tab={trashTab}
+        onTab={setTrashTab}
+        onClose={() => setTrashOpen(false)}
+        data={data}
+        categories={categories}
+        restoreFromTrash={restoreFromTrash}
+        deleteForever={deleteForever}
+        clearTrash={clearTrash}
+      />
 
       <ToastUndo show={!!undoState} label={undoState?.label} onUndo={undoLastDelete} onClose={closeUndo} />
     </div>
